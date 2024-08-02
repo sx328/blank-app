@@ -1,5 +1,13 @@
 import streamlit as st
 import pandas as pd
+import pydeck as pdk
+
+# List of US state abbreviations to filter the data
+us_states = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+             'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+             'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+             'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+             'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY']
 
 # Title of the app
 st.title('Order Data Analysis')
@@ -10,34 +18,50 @@ if uploaded_file is not None:
     # Read data from the uploaded CSV file
     data = pd.read_csv(uploaded_file)
 
-    # Try converting 'Created at' to datetime including parsing of timezone
     try:
+        # Convert 'Created at' to datetime, considering timezone
         data['Created at'] = pd.to_datetime(data['Created at'], utc=True, format='%Y-%m-%d %H:%M:%S %z')
         data['Month-Year'] = data['Created at'].dt.to_period('M')
 
-        # Display the uploaded dataframe
-        st.write("Uploaded Data:", data.head())
+        # Ensure the 'Billing Province' column is treated as state data
+        data['Billing Province'] = data['Billing Province'].str.upper()
+        filtered_data = data[data['Billing Province'].isin(us_states)]
 
-        # Calculating the average items per order
-        avg_items_per_order = data['Lineitem quantity'].mean()
-        st.write(f"Average Items per Order: {avg_items_per_order:.2f}")
+        # Display filtered data to check the 'Billing Province' content
+        st.write("Filtered Data by US States:", filtered_data.head())
 
-        # Calculating the average order value
-        avg_order_value = data['Total'].mean()
-        st.write(f"Average Order Value: ${avg_order_value:.2f}")
+        # Aggregate shipment counts by state for mapping
+        shipment_counts = filtered_data['Billing Province'].value_counts().reset_index()
+        shipment_counts.columns = ['state', 'count']
+        
+        # Check if any state data is available for mapping
+        if shipment_counts.empty:
+            st.error("No valid US state data found in the 'Billing Province' column.")
+        else:
+            max_count = shipment_counts['count'].max()
+            shipment_counts['count_normalized'] = shipment_counts['count'] / max_count
 
-        # Calculating the count of orders per month
-        orders_per_month = data.groupby('Month-Year').size()
+            # Define the layer for the choropleth map
+            layer = pdk.Layer(
+                "ChoroplethLayer",
+                shipment_counts,
+                get_polygon="https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json",
+                get_fill_color="[255 * (1 - count_normalized), 255 * (1 - count_normalized), 255 * (1 - count_normalized)]",
+                get_line_color="[255, 255, 255]",
+                pickable=True,
+                auto_highlight=True
+            )
 
-        # Creating a DataFrame for the line chart
-        chart_data = pd.DataFrame({
-            "Month": orders_per_month.index.astype(str),
-            "Number of Orders": orders_per_month.values
-        }).set_index('Month')
+            # Set the view location and zoom level for the map
+            view_state = pdk.ViewState(latitude=37.0902, longitude=-95.7129, zoom=3)
 
-        # Plotting the line chart for Number of Orders Per Month
-        st.line_chart(chart_data)
-        st.write("> Note: the latest month's data could be incomplete.")
+            # Render the deck.gl map in Streamlit
+            st.pydeck_chart(pdk.Deck(
+                map_style='mapbox://styles/mapbox/dark-v9',
+                layers=[layer],
+                initial_view_state=view_state,
+                tooltip={"text": "{state}: {count} shipments"}
+            ))
 
     except pd.errors.OutOfBoundsDatetime:
         st.error("Error: Out of bounds datetime - check date formats in 'Created at'")
