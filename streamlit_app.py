@@ -10,13 +10,13 @@ if uploaded_file is not None:
     # Read data from the uploaded CSV file
     data = pd.read_csv(uploaded_file)
 
-    # Attempt to convert 'Created at' to datetime
+    # Try converting 'Created at' to datetime including parsing of timezone
     try:
-        data['Created at'] = pd.to_datetime(data['Created at'])
+        data['Created at'] = pd.to_datetime(data['Created at'], utc=True, format='%Y-%m-%d %H:%M:%S %z')
+        data['Month-Year'] = data['Created at'].dt.to_period('M')
+
         # Display the uploaded dataframe
         st.write("Uploaded Data:", data.head())
-
-        data['Month-Year'] = data['Created at'].dt.to_period('M')
 
         # Calculating the average items per order
         avg_items_per_order = data['Lineitem quantity'].mean()
