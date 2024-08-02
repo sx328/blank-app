@@ -26,21 +26,18 @@ if uploaded_file is not None:
         avg_order_value = data['Total'].mean()
         st.write(f"Average Order Value: ${avg_order_value:.2f}")
 
-        # Calculating the average orders per month
-        avg_orders_per_month = data.groupby('Month-Year').size().mean()
-        st.write(f"Average Orders per Month: {avg_orders_per_month:.2f}")
-
-        # Calculating the average order value per month for the line chart
-        monthly_order_values = data.groupby('Month-Year')['Total'].mean().sort_index()
+        # Calculating the count of orders per month
+        orders_per_month = data.groupby('Month-Year').size()
 
         # Creating a DataFrame for the line chart
         chart_data = pd.DataFrame({
-            "Month": monthly_order_values.index.astype(str),
-            "Average Order Value": monthly_order_values.values
+            "Month": orders_per_month.index.astype(str),
+            "Number of Orders": orders_per_month.values
         }).set_index('Month')
 
-        # Plotting the line chart for Average Order Value Over Time
+        # Plotting the line chart for Number of Orders Per Month
         st.line_chart(chart_data)
+        st.write("> Note: the latest month's data could be incomplete.")
 
     except pd.errors.OutOfBoundsDatetime:
         st.error("Error: Out of bounds datetime - check date formats in 'Created at'")
