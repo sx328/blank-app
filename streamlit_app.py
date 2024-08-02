@@ -10,12 +10,12 @@ if uploaded_file is not None:
     # Read data from the uploaded CSV file
     data = pd.read_csv(uploaded_file)
 
-    # Display the uploaded dataframe
-    st.write("Uploaded Data:", data.head())
-
+    # Attempt to convert 'Created at' to datetime
     try:
-        # Converting 'Created at' to datetime and extracting the month
         data['Created at'] = pd.to_datetime(data['Created at'])
+        # Display the uploaded dataframe
+        st.write("Uploaded Data:", data.head())
+
         data['Month-Year'] = data['Created at'].dt.to_period('M')
 
         # Calculating the average items per order
@@ -42,6 +42,10 @@ if uploaded_file is not None:
         # Plotting the line chart for Average Order Value Over Time
         st.line_chart(chart_data)
 
+    except pd.errors.OutOfBoundsDatetime:
+        st.error("Error: Out of bounds datetime - check date formats in 'Created at'")
+    except ValueError:
+        st.error("Error: Invalid date format in 'Created at'")
     except KeyError as e:
         st.error(f"Missing column in data: {e}")
     except Exception as e:
